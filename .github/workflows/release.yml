@@ -15,12 +15,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 8
-        uses: actions/setup-java@v4
+      - name: Set up JDK 8u192
+        run: |
+          wget -q https://cdn.azul.com/zulu/bin/zulu8.33.0.1-ca-jdk8.0.192-linux_x64.tar.gz -O /tmp/jdk.tar.gz
+          mkdir -p $HOME/jdk
+          tar -xzf /tmp/jdk.tar.gz -C $HOME/jdk --strip-components=1
+          echo "JAVA_HOME=$HOME/jdk" >> $GITHUB_ENV
+          echo "$HOME/jdk/bin" >> $GITHUB_PATH
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
         with:
-          java-version: '8'
-          distribution: 'temurin'
-          cache: maven
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
 
       - name: Build with Maven
         run: mvn clean package -DskipTests
