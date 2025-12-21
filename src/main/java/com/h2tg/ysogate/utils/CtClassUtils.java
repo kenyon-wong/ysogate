@@ -55,6 +55,22 @@ public class CtClassUtils
         }
     }
 
+    public static void changeSerialVersionUID(String className, long serialVersionUID) throws Exception {
+        CtClass ctClass = Config.POOL.get(className);
+        if (hasSerialVersionUID(ctClass)) {
+            setCtField(ctClass, "serialVersionUID", CtField.Initializer.constant(serialVersionUID));
+        } else {
+            insertField(ctClass, "serialVersionUID", "private static final long serialVersionUID = " + serialVersionUID + "L;");
+        }
+
+        Class clazz;
+        try {
+            clazz = ctClass.toClass();
+        } catch (Exception e) {
+            clazz = Class.forName(className);
+        }
+    }
+
     public static String bypassJDKModuleBody() throws Exception {
         return "{try {\n" +
                 "            Class unsafeClass = Class.forName(\"sun.misc.Unsafe\");\n" +
